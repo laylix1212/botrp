@@ -8,12 +8,13 @@ const client = new Client({
 });
 
 const TARGET_GUILD_ID = '1497882563891564599';
+const VERSION = '1.0';
 
 // ─── Slash Commands ───────────────────────────────────────────────────────────
 const commands = [
   {
     name: 'ping',
-    description: '🏓 Vérifie si le bot est en ligne et affiche la latence.',
+    description: 'Vérifie si le bot est en ligne et affiche la latence.',
   },
 ];
 
@@ -29,29 +30,43 @@ async function registerCommands() {
     console.log('✅ Slash commands enregistrées avec succès !');
   } catch (error) {
     console.error('❌ Erreur lors de l\'enregistrement des commandes :', error);
+    console.error(error);
   }
 }
 
-// ─── Update Member Count Status ───────────────────────────────────────────────
-async function updateMemberStatus() {
+// ─── Statut alternant ─────────────────────────────────────────────────────────
+let statusIndex = 0;
+let cachedMemberCount = null;
+
+async function fetchMemberCount() {
   try {
     const guild = await client.guilds.fetch(TARGET_GUILD_ID);
-    const memberCount = guild.memberCount;
-
-    client.user.setPresence({
-      activities: [
-        {
-          name: `👥 ${memberCount} membres`,
-          type: ActivityType.Watching,
-        },
-      ],
-      status: 'online',
-    });
-
-    console.log(`🔄 Statut mis à jour : ${memberCount} membres`);
+    cachedMemberCount = guild.memberCount;
   } catch (error) {
-    console.error('❌ Erreur lors de la mise à jour du statut :', error);
+    console.error('❌ Erreur lors de la récupération des membres :', error);
   }
+}
+
+function updateStatus() {
+  const statuses = [
+    `Regarde ${cachedMemberCount ?? '...'} Membres`,
+    `Regarde Version ${VERSION}`,
+  ];
+
+  const text = statuses[statusIndex % statuses.length];
+  statusIndex++;
+
+  client.user.setPresence({
+    activities: [
+      {
+        name: text,
+        type: ActivityType.Watching,
+      },
+    ],
+    status: 'online',
+  });
+
+  console.log(`🔄 Statut : ${text}`);
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
@@ -59,10 +74,14 @@ client.once('ready', async () => {
   console.log(`✅ Bot connecté en tant que ${client.user.tag}`);
 
   await registerCommands();
-  await updateMemberStatus();
+  await fetchMemberCount();
+  updateStatus();
 
-  // Actualisation du statut toutes les 10 secondes
-  setInterval(updateMemberStatus, 10_000);
+  // Mise à jour du nombre de membres toutes les 30s
+  setInterval(fetchMemberCount, 30_000);
+
+  // Switch du statut toutes les 5 secondes
+  setInterval(updateStatus, 5_000);
 });
 
 client.on('interactionCreate', async (interaction) => {
@@ -73,7 +92,7 @@ client.on('interactionCreate', async (interaction) => {
   if (commandName === 'ping') {
     const latency = Math.round(client.ws.ping);
     await interaction.reply({
-      content: `🏓 Pong ! Latence : **${latency}ms**`,
+      content: `Pong ! Latence : **${latency}ms**`,
       ephemeral: true,
     });
   }
