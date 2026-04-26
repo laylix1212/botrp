@@ -23,15 +23,15 @@ const client = new Client({
 });
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const TARGET_GUILD_ID     = '1497882563891564599';
-const WELCOME_CHANNEL_ID  = '1497903862886174832';
-const RULES_CHANNEL_ID    = '1497904140498632824';
+const TARGET_GUILD_ID       = '1497882563891564599';
+const WELCOME_CHANNEL_ID    = '1497903862886174832';
+const RULES_CHANNEL_ID      = '1497904140498632824';
 const TRANSCRIPT_CHANNEL_ID = '1497923167686230076';
-const VERSION             = '1.0';
+const VERSION               = '1.0';
 
-const ROLE_SUPPORT        = '1497907162158989352';
+const ROLE_SUPPORT          = '1497907162158989352';
 
-const ROLES_STAFF_ONLY    = [
+const ROLES_STAFF_ONLY      = [
   '1497890931536433172',
   '1497891406008680539',
   '1497891482743472158',
@@ -46,26 +46,19 @@ const CATEGORIES = {
 };
 
 const TYPE_CONFIG = {
-  question:      { label: 'Question',         emoji: '❓', staffOnly: false },
-  report_joueur: { label: 'Report Joueur',     emoji: '⚠️', staffOnly: false },
-  report_staff:  { label: 'Report Staff',      emoji: '🔒', staffOnly: true  },
-  demande_role:  { label: 'Demande de Rôle',   emoji: '📝', staffOnly: true  },
+  question:      { label: 'Question',       emoji: '❓', staffOnly: false },
+  report_joueur: { label: 'Report Joueur',   emoji: '⚠️', staffOnly: false },
+  report_staff:  { label: 'Report Staff',    emoji: '🔒', staffOnly: true  },
+  demande_role:  { label: 'Demande de Rôle', emoji: '📝', staffOnly: true  },
 };
 
-// ticketData stocke les infos en mémoire : clé = channelId
-// { openerId, openerTag, openerCreatedAt, staffId, staffTag, type, openedAt }
+// ticketData : clé = channelId
 const ticketData = new Map();
 
 // ─── Slash Commands ───────────────────────────────────────────────────────────
 const commands = [
-  {
-    name: 'ping',
-    description: 'Vérifie si le bot est en ligne et affiche la latence.',
-  },
-  {
-    name: 'panel-setup',
-    description: '📋 Envoie le panel de tickets dans ce salon.',
-  },
+  { name: 'ping',        description: 'Vérifie si le bot est en ligne et affiche la latence.' },
+  { name: 'panel-setup', description: 'Envoie le panel de tickets dans ce salon.' },
 ];
 
 async function registerCommands() {
@@ -136,9 +129,9 @@ client.on('guildMemberAdd', async (member) => {
 async function createTicket(interaction, type) {
   await interaction.deferReply({ ephemeral: true });
 
-  const guild  = interaction.guild;
-  const member = interaction.member;
-  const config = TYPE_CONFIG[type];
+  const guild      = interaction.guild;
+  const member     = interaction.member;
+  const config     = TYPE_CONFIG[type];
   const categoryId = CATEGORIES[type];
 
   // Anti-doublon
@@ -192,21 +185,19 @@ async function createTicket(interaction, type) {
     permissionOverwrites,
   });
 
-  // Stocker les données du ticket
   ticketData.set(ticketChannel.id, {
-    openerId: member.id,
-    openerTag: member.user.tag,
+    openerId:        member.id,
+    openerTag:       member.user.tag,
     openerCreatedAt: member.user.createdAt,
-    openerJoinedAt: member.joinedAt,
-    openerAvatar: member.user.displayAvatarURL({ dynamic: true, size: 256 }),
-    staffId: null,
-    staffTag: null,
+    openerJoinedAt:  member.joinedAt,
+    openerAvatar:    member.user.displayAvatarURL({ dynamic: true, size: 256 }),
+    staffId:         null,
+    staffTag:        null,
     type,
-    label: config.label,
-    openedAt: new Date(),
+    label:           config.label,
+    openedAt:        new Date(),
   });
 
-  // Embed d'ouverture + bouton "Prendre en charge"
   const embed = new EmbedBuilder()
     .setColor(0xFFFFFF)
     .setTitle(`${config.emoji} Ticket — ${config.label}`)
@@ -255,18 +246,6 @@ async function sendTranscript(guild, channel, data, closedBy) {
   }
   allMessages.reverse();
 
-  // Formater la conversation
-  const conversation = allMessages
-    .map((m) => {
-      const time = m.createdAt.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
-      const attachments = m.attachments.size > 0
-        ? `\n    📎 Pièces jointes : ${m.attachments.map((a) => a.url).join(', ')}`
-        : '';
-      const embeds = m.embeds.length > 0 ? `\n    📋 [Embed présent]` : '';
-      return `[${time}] ${m.author.tag} : ${m.content || '*(aucun texte)*'}${attachments}${embeds}`;
-    })
-    .join('\n');
-
   // Infos opener
   const opener = await guild.members.fetch(data.openerId).catch(() => null);
   const openerRoles = opener
@@ -274,74 +253,117 @@ async function sendTranscript(guild, channel, data, closedBy) {
     : 'Introuvable';
 
   // Infos staff
-  const staffMember = data.staffId
-    ? await guild.members.fetch(data.staffId).catch(() => null)
-    : null;
-  const staffRoles = staffMember
+  const staffMember = data.staffId ? await guild.members.fetch(data.staffId).catch(() => null) : null;
+  const staffRoles  = staffMember
     ? staffMember.roles.cache.filter((r) => r.id !== guild.id).map((r) => r.name).join(', ') || 'Aucun'
     : 'N/A';
 
-  const closedAt = new Date();
-  const duration = Math.round((closedAt - data.openedAt) / 1000 / 60);
+  const closedAt   = new Date();
+  const durationMs = closedAt - data.openedAt;
+  const dH         = Math.floor(durationMs / 3600000);
+  const dM         = Math.floor((durationMs % 3600000) / 60000);
+  const dS         = Math.floor((durationMs % 60000) / 1000);
+  const durationStr = `${dH}h ${dM}m ${dS}s`;
 
+  const fmt = (d) => d ? d.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' }) : 'Inconnu';
+  const SEP  = '='.repeat(62);
+  const sep2 = '-'.repeat(62);
+
+  // ── Fichier .txt ──────────────────────────────────────────────────────────
+  let txt = '';
+  txt += `${SEP}\n`;
+  txt += `         TRANSCRIPT DU TICKET — ${data.label.toUpperCase()}\n`;
+  txt += `${SEP}\n\n`;
+
+  txt += `-- INFORMATIONS GÉNÉRALES ${sep2.slice(26)}\n`;
+  txt += `  Salon           : #${channel.name} (${channel.id})\n`;
+  txt += `  Type            : ${data.label}\n`;
+  txt += `  Ticket ID       : ${channel.id}\n`;
+  txt += `  Ouvert le       : ${fmt(data.openedAt)}\n`;
+  txt += `  Fermé le        : ${fmt(closedAt)}\n`;
+  txt += `  Durée           : ${durationStr}\n`;
+  txt += `  Nb de messages  : ${allMessages.length}\n\n`;
+
+  txt += `-- MEMBRE ${sep2.slice(10)}\n`;
+  txt += `  Nom             : ${data.openerTag}\n`;
+  txt += `  ID              : ${data.openerId}\n`;
+  txt += `  Compte créé le  : ${fmt(data.openerCreatedAt)}\n`;
+  txt += `  A rejoint le    : ${fmt(data.openerJoinedAt)}\n`;
+  txt += `  Rôles           : ${openerRoles}\n\n`;
+
+  txt += `-- STAFF EN CHARGE ${sep2.slice(18)}\n`;
+  txt += `  Nom             : ${data.staffTag ?? 'Non pris en charge'}\n`;
+  txt += `  ID              : ${data.staffId  ?? 'N/A'}\n`;
+  txt += `  Rôles           : ${staffRoles}\n`;
+  txt += `  Fermé par       : ${closedBy.tag} (${closedBy.id})\n\n`;
+
+  txt += `-- CONVERSATION ${sep2.slice(15)}\n\n`;
+
+  for (const m of allMessages) {
+    txt += `[${fmt(m.createdAt)}] ${m.author.tag} (ID: ${m.author.id})\n`;
+    if (m.content)            txt += `  ${m.content}\n`;
+    if (m.embeds.length > 0)  txt += `  [${m.embeds.length} embed(s)]\n`;
+    m.attachments.forEach((a) => { txt += `  Pièce jointe : ${a.url}\n`; });
+    txt += '\n';
+  }
+
+  txt += `${SEP}\n`;
+  txt += `  Généré le : ${fmt(closedAt)} — ${guild.name}\n`;
+  txt += `${SEP}\n`;
+
+  const fileBuffer = Buffer.from(txt, 'utf-8');
+  const fileName   = `transcript-${data.label.toLowerCase().replace(/\s+/g, '-')}-${channel.name}.txt`;
+
+  // ── Embed résumé épuré ────────────────────────────────────────────────────
   const embed = new EmbedBuilder()
     .setColor(0xC0392B)
-    .setTitle(`📁 Transcript — ${data.label}`)
-    .setThumbnail(data.openerAvatar)
+    .setTitle(`Ticket fermé — Ticket ${data.label}`)
     .addFields(
-      // ── Infos ticket ──
-      { name: '━━━━━━━━━━━━━━━━━━━━━━ 🎫 Ticket', value: '\u200b', inline: false },
-      { name: 'Type',            value: `${data.label}`,                                          inline: true },
-      { name: 'Ouvert le',       value: data.openedAt.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' }), inline: true },
-      { name: 'Fermé le',        value: closedAt.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' }),       inline: true },
-      { name: 'Durée',           value: `${duration} minute(s)`,                                  inline: true },
-      { name: 'Messages',        value: `${allMessages.length}`,                                  inline: true },
-      { name: 'Fermé par',       value: closedBy.tag,                                             inline: true },
-
-      // ── Infos membre ──
-      { name: '━━━━━━━━━━━━━━━━━━━━━━ 👤 Membre', value: '\u200b', inline: false },
-      { name: 'Nom',             value: data.openerTag,                                           inline: true },
-      { name: 'ID',              value: data.openerId,                                            inline: true },
-      { name: 'Compte créé le',  value: data.openerCreatedAt.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' }), inline: true },
-      { name: 'A rejoint le',    value: data.openerJoinedAt
-          ? data.openerJoinedAt.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })
-          : 'Inconnu',                                                                             inline: true },
-      { name: 'Rôles',           value: openerRoles,                                              inline: false },
-
-      // ── Infos staff ──
-      { name: '━━━━━━━━━━━━━━━━━━━━━━ 🛡️ Staff en charge', value: '\u200b', inline: false },
-      { name: 'Nom',             value: data.staffTag  ?? 'Non pris en charge',                  inline: true },
-      { name: 'ID',              value: data.staffId   ?? 'N/A',                                 inline: true },
-      { name: 'Rôles',           value: staffRoles,                                              inline: false },
-
-      // ── Conversation ──
-      { name: '━━━━━━━━━━━━━━━━━━━━━━ 💬 Conversation', value: '\u200b', inline: false },
+      {
+        name:   'Salon',
+        value:  `#${channel.name} (\`${channel.id}\`)`,
+        inline: false,
+      },
+      {
+        name:   'Ouvert par',
+        value:  `${data.openerTag}\n• ID : \`${data.openerId}\``,
+        inline: true,
+      },
+      {
+        name:   'Fermé par',
+        value:  `${closedBy.tag}\n• ID : \`${closedBy.id}\``,
+        inline: true,
+      },
+      {
+        name:   'Pris en charge par',
+        value:  data.staffTag ? `${data.staffTag}\n• ID : \`${data.staffId}\`` : 'Personne',
+        inline: true,
+      },
+      {
+        name:   'Ouvert le',
+        value:  fmt(data.openedAt),
+        inline: true,
+      },
+      {
+        name:   'Durée',
+        value:  durationStr,
+        inline: true,
+      },
+      {
+        name:   'Messages',
+        value:  `${allMessages.length}`,
+        inline: true,
+      },
     )
-    .setFooter({ text: guild.name, iconURL: guild.iconURL() })
+    .setFooter({ text: `Ticket ID : ${channel.id}`, iconURL: guild.iconURL() })
     .setTimestamp();
 
-  // La conversation peut être longue : on la coupe en champs de 1024 chars
-  const chunks = [];
-  let current = '';
-  for (const line of conversation.split('\n')) {
-    if ((current + '\n' + line).length > 1020) {
-      chunks.push(current);
-      current = line;
-    } else {
-      current += (current ? '\n' : '') + line;
-    }
-  }
-  if (current) chunks.push(current);
+  await transcriptChannel.send({
+    embeds: [embed],
+    files: [{ attachment: fileBuffer, name: fileName }],
+  });
 
-  for (let i = 0; i < chunks.length; i++) {
-    embed.addFields({
-      name: i === 0 ? 'Messages' : '\u200b',
-      value: `\`\`\`${chunks[i]}\`\`\``,
-      inline: false,
-    });
-  }
-
-  await transcriptChannel.send({ embeds: [embed] });
+  console.log(`📁 Transcript envoyé pour le ticket ${channel.name}`);
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────
@@ -372,7 +394,7 @@ client.on('interactionCreate', async (interaction) => {
         .setColor(0xFFFFFF)
         .setTitle('🎫 Support — Ouvrir un ticket')
         .setDescription(
-          'Besoin d\'aide ? Sélectionne le type de ticket qui correspond à ta demande dans le menu ci-dessous.\n\n' +
+          'Besoin d\'aide ? Sélectionne le type de ticket dans le menu ci-dessous.\n\n' +
           '❓ **Question** — Tu as une question générale sur le serveur ou le jeu.\n\n' +
           '⚠️ **Report Joueur** — Tu souhaites signaler le comportement d\'un joueur.\n\n' +
           '🔒 **Report Staff** — Tu souhaites signaler un membre du staff. *(confidentiel)*\n\n' +
@@ -385,10 +407,10 @@ client.on('interactionCreate', async (interaction) => {
           .setCustomId('ticket_select')
           .setPlaceholder('Sélectionne un type de ticket...')
           .addOptions([
-            { label: 'Question',        description: 'Poser une question générale',              value: 'question',      emoji: '❓' },
-            { label: 'Report Joueur',   description: 'Signaler un joueur',                       value: 'report_joueur', emoji: '⚠️' },
+            { label: 'Question',        description: 'Poser une question générale',               value: 'question',      emoji: '❓' },
+            { label: 'Report Joueur',   description: 'Signaler un joueur',                        value: 'report_joueur', emoji: '⚠️' },
             { label: 'Report Staff',    description: 'Signaler un membre du staff (confidentiel)', value: 'report_staff',  emoji: '🔒' },
-            { label: 'Demande de Rôle', description: 'Faire une demande de rôle',                value: 'demande_role',  emoji: '📝' },
+            { label: 'Demande de Rôle', description: 'Faire une demande de rôle',                 value: 'demande_role',  emoji: '📝' },
           ])
       );
 
@@ -411,7 +433,6 @@ client.on('interactionCreate', async (interaction) => {
       const member  = interaction.member;
       const data    = ticketData.get(channel.id);
 
-      // Seul le rôle Support Ticket peut prendre en charge
       if (!member.roles.cache.has(ROLE_SUPPORT)) {
         return interaction.reply({
           content: '❌ Seul le rôle **Support Ticket** peut prendre en charge un ticket.',
@@ -419,7 +440,6 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      // Déjà pris en charge ?
       if (data && data.staffId) {
         return interaction.reply({
           content: `❌ Ce ticket est déjà pris en charge par <@${data.staffId}>.`,
@@ -427,25 +447,18 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      // Mettre à jour les données
       if (data) {
         data.staffId  = member.id;
         data.staffTag = member.user.tag;
       }
 
-      // Retirer SendMessages à tous les autres membres du rôle Support Ticket
-      // (on le fait en retirant la permission au rôle et en l'ajoutant uniquement au staff qui prend)
-      await channel.permissionOverwrites.edit(ROLE_SUPPORT, {
-        SendMessages: false,
-      });
+      await channel.permissionOverwrites.edit(ROLE_SUPPORT, { SendMessages: false });
       await channel.permissionOverwrites.edit(member.id, {
         ViewChannel: true,
         SendMessages: true,
         ReadMessageHistory: true,
       });
 
-      // Mettre à jour l'embed du message original (désactiver le bouton)
-      const originalMessage = interaction.message;
       const disabledRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId('ticket_claim')
@@ -460,13 +473,16 @@ client.on('interactionCreate', async (interaction) => {
           .setStyle(ButtonStyle.Danger),
       );
 
-      await originalMessage.edit({ components: [disabledRow] });
+      await interaction.message.edit({ components: [disabledRow] });
 
       await channel.send({
         embeds: [
           new EmbedBuilder()
             .setColor(0xFFFFFF)
-            .setDescription(`✋ **${member.user.tag}** a pris ce ticket en charge.\n\nSeuls ${member} et le membre ayant ouvert le ticket peuvent désormais écrire.`)
+            .setDescription(
+              `✋ **${member.user.tag}** a pris ce ticket en charge.\n\n` +
+              `Seuls ${member} et le membre ayant ouvert le ticket peuvent désormais écrire.`
+            )
             .setTimestamp(),
         ],
       });
@@ -480,7 +496,6 @@ client.on('interactionCreate', async (interaction) => {
       const member  = interaction.member;
       const data    = ticketData.get(channel.id);
 
-      // Seul le staff qui a pris le ticket peut fermer
       if (!data || data.staffId !== member.id) {
         return interaction.reply({
           content: '❌ Seul le membre du staff ayant pris ce ticket en charge peut le fermer.',
@@ -492,14 +507,15 @@ client.on('interactionCreate', async (interaction) => {
         embeds: [
           new EmbedBuilder()
             .setColor(0xC0392B)
-            .setDescription('🔒 Ticket en cours de fermeture...\n\nLe transcript est en cours de génération, le salon sera supprimé dans **5 secondes**.'),
+            .setDescription(
+              '🔒 Ticket en cours de fermeture...\n\n' +
+              'Le transcript est en cours de génération, le salon sera supprimé dans **5 secondes**.'
+            ),
         ],
       });
 
-      // Envoyer le transcript
       await sendTranscript(interaction.guild, channel, data, member.user);
 
-      // Supprimer après 5 secondes
       setTimeout(async () => {
         await channel.delete().catch(() => null);
         ticketData.delete(channel.id);
