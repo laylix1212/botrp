@@ -49,8 +49,8 @@ async function fetchMemberCount() {
 
 function updateStatus() {
   const statuses = [
-    `Regarde ${cachedMemberCount ?? '...'} Membres`,
-    `Regarde Version ${VERSION}`,
+    `${cachedMemberCount ?? '...'} Membres`,
+    `Version ${VERSION}`,
   ];
 
   const text = statuses[statusIndex % statuses.length];
