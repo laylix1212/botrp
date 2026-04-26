@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActivityType, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, REST, Routes, EmbedBuilder } = require('discord.js');
 
 const client = new Client({
   intents: [
@@ -7,8 +7,10 @@ const client = new Client({
   ],
 });
 
-const TARGET_GUILD_ID = '1497882563891564599';
-const VERSION = '1.0';
+const TARGET_GUILD_ID    = '1497882563891564599';
+const WELCOME_CHANNEL_ID = '1497903862886174832';
+const RULES_CHANNEL_ID   = '1497904140498632824';
+const VERSION            = '1.0';
 
 // ─── Slash Commands ───────────────────────────────────────────────────────────
 const commands = [
@@ -30,7 +32,6 @@ async function registerCommands() {
     console.log('✅ Slash commands enregistrées avec succès !');
   } catch (error) {
     console.error('❌ Erreur lors de l\'enregistrement des commandes :', error);
-    console.error(error);
   }
 }
 
@@ -49,7 +50,7 @@ async function fetchMemberCount() {
 
 function updateStatus() {
   const statuses = [
-    `${cachedMemberCount ?? '...'} Membres`,
+    `${cachedMemberCount ?? '...'} membres`,
     `Version ${VERSION}`,
   ];
 
@@ -57,17 +58,43 @@ function updateStatus() {
   statusIndex++;
 
   client.user.setPresence({
-    activities: [
-      {
-        name: text,
-        type: ActivityType.Watching,
-      },
-    ],
+    activities: [{ name: text, type: ActivityType.Watching }],
     status: 'online',
   });
 
   console.log(`🔄 Statut : ${text}`);
 }
+
+// ─── Bienvenue ────────────────────────────────────────────────────────────────
+client.on('guildMemberAdd', async (member) => {
+  try {
+    const channel = await member.guild.channels.fetch(WELCOME_CHANNEL_ID);
+    if (!channel) return;
+
+    const memberCount = member.guild.memberCount;
+
+    const embed = new EmbedBuilder()
+      .setColor(0xFFFFFF)
+      .setTitle('Bienvenue sur le serveur !')
+      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+      .setDescription(
+        `Heureux de t'accueillir parmi nous, ${member} ! 👋\n\n` +
+        `Tu es notre **${memberCount}ème membre** à nous rejoindre. 🎉\n\n` +
+        `Avant de commencer, pense à lire le <#${RULES_CHANNEL_ID}> pour profiter du serveur dans les meilleures conditions. 📋`
+      )
+      .setFooter({ text: `${member.guild.name}`, iconURL: member.guild.iconURL() })
+      .setTimestamp();
+
+    await channel.send({
+      content: `${member}`,
+      embeds: [embed],
+    });
+
+    console.log(`👋 Bienvenue envoyé pour ${member.user.tag} (membre n°${memberCount})`);
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'envoi du message de bienvenue :', error);
+  }
+});
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 client.once('ready', async () => {
@@ -77,19 +104,14 @@ client.once('ready', async () => {
   await fetchMemberCount();
   updateStatus();
 
-  // Mise à jour du nombre de membres toutes les 30s
   setInterval(fetchMemberCount, 30_000);
-
-  // Switch du statut toutes les 5 secondes
   setInterval(updateStatus, 5_000);
 });
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  const { commandName } = interaction;
-
-  if (commandName === 'ping') {
+  if (interaction.commandName === 'ping') {
     const latency = Math.round(client.ws.ping);
     await interaction.reply({
       content: `Pong ! Latence : **${latency}ms**`,
